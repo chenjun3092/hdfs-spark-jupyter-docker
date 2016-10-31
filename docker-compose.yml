@@ -30,8 +30,6 @@ services:
     hostname: datanode2
     container_name: datanode2
     domainname: hadoop
-    networks: 
-      - hadoop
     volumes:
       - ./data/datanode2:/hadoop/dfs/data
     env_file:
@@ -57,8 +55,6 @@ services:
     image: earthquakesan/hadoop-spark-worker:1.0.0
     hostname: spark-worker
     domainname: hadoop
-    networks: 
-      - hadoop
     environment:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
       - YARN_CONF_yarn_resourcemanager_hostname=resourcemanager
@@ -69,17 +65,17 @@ services:
     env_file:
       - ./hadoop.env
 
-  spark-notebook:
-    image: earthquakesan/hadoop-spark-notebook:1.0.0
-    hostname: sparknotebook
-    container_name: sparknotebook
+  jupyter-notebook:
+    image: jupyter/all-spark-notebook:latest
+    hostname: jupyternotebook
+    container_name: jupyternotebook
     domainname: hadoop
-    environment:
-      - SPARK_NOTEBOOK_MASTER=yarn-client
     env_file:
       - ./hadoop.env
+    volumes:
+      - ./notebooks:/home/jovyan/work
     ports:
-      - "9000:9000"
+      - "8889:8888"
 
   hue:
     image: bde2020/hdfs-filebrowser:3.9
