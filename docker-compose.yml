@@ -14,6 +14,8 @@ services:
     ports:
       - "50070:50070"
       - "8020:8020"
+    networks:
+      - hadoop
 
   datanode1:
     image: bde2020/hadoop-datanode:1.0.0
@@ -24,6 +26,8 @@ services:
       - ./data/datanode1:/hadoop/dfs/data
     env_file:
       - ./hadoop.env
+    networks:
+      - hadoop
 
   datanode2:
     image: bde2020/hadoop-datanode:1.0.0
@@ -34,55 +38,73 @@ services:
       - ./data/datanode2:/hadoop/dfs/data
     env_file:
       - ./hadoop.env
+    networks:
+      - hadoop
 
   spark-master:
-    image: earthquakesan/hadoop-spark-master:1.0.0
+    image: thuongdinh/docker-spark-anaconda:latest
     hostname: spark-master
+    command: bin/spark-class org.apache.spark.deploy.master.Master -h spark-master
+    environment:
+      - MASTER=spark://spark-master:7077
+      - SPARK_PUBLIC_DNS=localhost
+    volumes:
+      - ./notebooks:/opt/notebooks
     container_name: spark-master
     domainname: hadoop
-    environment:
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-      - YARN_CONF_yarn_resourcemanager_hostname=resourcemanager
-      - SPARK_CONF_spark_eventLog_enabled=true
-      - SPARK_CONF_spark_eventLog_dir=hdfs://namenode:8020/spark-logs
-      - SPARK_CONF_spark_history_fs_logDirectory=hdfs://namenode:8020/spark-logs
-    env_file:
-      - ./hadoop.env
     ports:
-        - "8080:8080"
+        - "9090:8080"
+    links:
+      - namenode
+    networks:
+      - hadoop
 
   spark-worker:
-    image: earthquakesan/hadoop-spark-worker:1.0.0
+    image: thuongdinh/docker-spark-anaconda:latest
     hostname: spark-worker
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     domainname: hadoop
     environment:
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-      - YARN_CONF_yarn_resourcemanager_hostname=resourcemanager
-      - SPARK_CONF_spark_eventLog_enabled=true
-      - SPARK_CONF_spark_eventLog_dir=hdfs://namenode:8020/spark-logs
-      - SPARK_CONF_spark_history_fs_logDirectory=hdfs://namenode:8020/spark-logs
       - SPARK_MASTER_URL=spark://spark-master:7077
-    env_file:
-      - ./hadoop.env
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=1g
+      - SPARK_PUBLIC_DNS=localhost
+    volumes:
+      - ./notebooks:/opt/notebooks
+    links:
+      - spark-master
+    networks:
+      - hadoop
 
   jupyter-notebook:
-    image: jupyter/all-spark-notebook:latest
+    image: thuongdinh/docker-spark-anaconda:latest
     hostname: jupyternotebook
     container_name: jupyternotebook
     domainname: hadoop
+    command: /bin/bash -c "/opt/conda/bin/conda install jupyter -y --quiet && /opt/conda/bin/jupyter notebook --notebook-dir=/opt/notebooks --ip='*' --port=8888 --no-browser"
     env_file:
       - ./hadoop.env
     volumes:
-      - ./notebooks:/home/jovyan/work
+      - ./notebooks:/opt/notebooks
     ports:
       - "8889:8888"
+    links:
+      - spark-master
+    networks:
+      - hadoop
 
   hue:
     image: bde2020/hdfs-filebrowser:3.9
     hostname: hdfsfb
     container_name: hdfsfb
     domainname: hadoop
+    networks:
+      - hadoop
     environment:
       - NAMENODE_HOST=namenode
     ports:
       - "8088:8088"
+
+networks:
+  hadoop:
+    external: true
